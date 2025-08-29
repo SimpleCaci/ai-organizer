@@ -1,20 +1,23 @@
-import openai
-import os 
+# utils/ai_parser.py
 
-api_key = os.getenv("API_KEY") 
+import json
+import dateparser
+from datetime import datetime, timedelta
 
-openai.api_key = api_key  # Replace with your key or use environment variables
-
-def parse_tasks(user_input):
-    prompt = f"""
-    Extract tasks and due dates from the following text. 
-    Return them as a JSON list with 'task', 'deadline' (if mentioned), and 'priority' (high/medium/low).
-    
-    Text:
-    {user_input}
+def load_manual_tasks(json_text: str):
     """
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response['choices'][0]['message']['content']
+    Parse manually pasted JSON from ChatGPT.
+    Converts 'time' fields into datetime objects when possible.
+    """
+    try:
+        data = json.loads(json_text)
+        for t in data.get("tasks", []):
+            raw_time = t.get("time")
+            if raw_time and raw_time.lower() != "null":
+                dt = dateparser.parse(raw_time, settings={"PREFER_DATES_FROM": "future"})
+                t["parsed_time"] = dt if dt else raw_time
+            else:
+                t["parsed_time"] = None
+        return data
+    except json.JSONDecodeError as e:
+        return {"error": f"Invalid JSON: {e}"}
